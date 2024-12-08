@@ -10,17 +10,20 @@ header('Content-Type: application/json');
 // config.php dosyasını dahil et
 require 'config.php';
 
-// POST ile gelen verileri kontrol et
-if (!empty($_POST["loginUser"]) && !empty($_POST["loginPass"])) {
-    // Kullanıcı verilerini temizle
-    $loginUser = trim($_POST["loginUser"]);
-    $loginPass = trim($_POST["loginPass"]);
+// JSON verisini alma ve çözme
+$data = json_decode(file_get_contents('php://input'), true);
 
+// Gelen verileri kontrol et
+$loginUser = $data['loginUser'] ?? $_POST['loginUser'] ?? null;
+$loginPass = $data['loginPass'] ?? $_POST['loginPass'] ?? null;
+
+if (!empty($loginUser) && !empty($loginPass)) {
     // Veritabanı bağlantısı oluştur
     $conn = new mysqli($servername, $username, $password, $dbname);
 
     // Bağlantı kontrolü
     if ($conn->connect_error) {
+        http_response_code(500);
         echo json_encode([
             "status" => "error",
             "message" => "Bağlantı başarısız: " . $conn->connect_error
@@ -42,7 +45,8 @@ if (!empty($_POST["loginUser"]) && !empty($_POST["loginPass"])) {
         if ($result->num_rows > 0) {
             // Veritabanından alınan şifreyi kontrol et
             $row = $result->fetch_assoc();
-            if ($loginPass == $row["password"]) {
+            if ($loginPass == $row["password"]) { // Eğer şifreler hash'lenmişse, password_verify kullanılmalı.
+                http_response_code(200);
                 echo json_encode([
                     "status" => "success",
                     "message" => "Giriş başarılı!"
