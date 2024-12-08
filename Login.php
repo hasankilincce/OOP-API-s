@@ -10,41 +10,79 @@ header('Content-Type: application/json');
 // config.php dosyasını dahil et
 require 'config.php';
 
-// Veritabanı bağlantısını oluştur
-$conn = new mysqli($servername, $username, $password, $dbname);
+// JSON verisini alma ve çözme
+$data = json_decode(file_get_contents('php://input'), true);
 
-// Bağlantıyı kontrol et
-if ($conn->connect_error) {
-    http_response_code(500);
-    echo json_encode([
-        "status" => "error",
-        "message" => "Bağlantı başarısız: " . $conn->connect_error
-    ]);
-    exit;
-}
+// Gelen verileri kontrol et
+$loginUser = $data['loginUser'] ?? $_POST['loginUser'] ?? null;
+$loginPass = $data['loginPass'] ?? $_POST['loginPass'] ?? null;
 
-// Kullanıcıları sorgula
-$sql = "SELECT username FROM users";
-$result = $conn->query($sql);
+if (!empty($loginUser) && !empty($loginPass)) {
+    // Veritabanı bağlantısı oluştur
+    $conn = new mysqli($servername, $username, $password, $dbname);
 
-if ($result && $result->num_rows > 0) {
-    $users = [];
-    while ($row = $result->fetch_assoc()) {
-        $users[] = $row["username"];
+    // Bağlantı kontrolü
+    if ($conn->connect_error) {
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Bağlantı başarısız: " . $conn->connect_error
+        ]);
+        exit;
     }
 
-    echo json_encode([
-        "status" => "success",
-        "data" => $users
-    ]);
+    // SQL sorgusunu prepared statement ile oluştur
+    $sql = "SELECT password FROM users WHERE username = ?";
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+        // Kullanıcı adını sorguya bağla ve çalıştır
+        $stmt->bind_param("s", $loginUser);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        // Sonuçları kontrol et
+        if ($result->num_rows > 0) {
+            // Veritabanından alınan şifreyi kontrol et
+            $row = $result->fetch_assoc();
+            if ($loginPass == $row["password"]) { // Eğer şifreler hash'lenmişse, password_verify kullanılmalı.
+                http_response_code(200);
+                echo json_encode([
+                    "status" => "success",
+                    "message" => "Giriş başarılı!"
+                ]);
+            } else {
+                http_response_code(401);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Hatalı şifre!"
+                ]);
+            }
+        } else {
+            http_response_code(404);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Böyle bir kullanıcı bulunamadı!"
+            ]);
+        }
+
+        // Kaynakları serbest bırak
+        $stmt->close();
+    } else {
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Sorgu hatası: " . $conn->error
+        ]);
+    }
+
+    // Veritabanı bağlantısını kapat
+    $conn->close();
 } else {
-    http_response_code(404);
+    http_response_code(400);
     echo json_encode([
         "status" => "error",
-        "message" => "Kullanıcı bulunamadı."
+        "message" => "Lütfen kullanıcı adı ve şifre giriniz!"
     ]);
 }
-
-// Veritabanı bağlantısını kapat
-$conn->close();
 ?>
