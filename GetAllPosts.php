@@ -41,7 +41,7 @@ if ($result && $result->num_rows > 0) {
             "username" => $row['username'],
             "name" => $row['name'],
             "created_at" => $row['created_at'],
-            "post" => $row['body']
+            "text" => $row['body']
         ];
     }
     http_response_code(200);
