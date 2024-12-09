@@ -68,7 +68,7 @@ if ($stmt1) {
 
     if (!empty($hashtags)) {
         // İlk hashtag'i kullanarak kategori belirle
-        $hashtag = $hashtags[0];
+        $hashtag = strtolower($hashtags[0]); // Küçük harfe çevir
 
         // Kategori kontrolü
         $sqlCategoryCheck = "SELECT id FROM categories WHERE name = ?";
