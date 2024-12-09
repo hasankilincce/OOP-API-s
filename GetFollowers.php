@@ -90,16 +90,21 @@ if ($stmtFollowers) {
         ];
     }
 
-    if (!empty($followers)) {
+    // Takipçi sayısını hesapla
+    $followersCount = count($followers);
+
+    if ($followersCount > 0) {
         http_response_code(200);
         echo json_encode([
             "status" => "success",
-            "data" => $followers
+            "count" => $followersCount, // Takipçi sayısı
+            "data" => $followers       // Takipçi bilgileri
         ]);
     } else {
         http_response_code(404);
         echo json_encode([
             "status" => "error",
+            "count" => 0, // Takipçi sayısı sıfır
             "message" => "Sizi takip eden kullanıcı bulunamadı."
         ]);
     }
