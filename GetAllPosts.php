@@ -25,7 +25,7 @@ if ($conn->connect_error) {
 
 // SQL sorgusu: Tüm postları getirir
 $sql = "
-    SELECT u.username, p.body, p.created_at
+    SELECT u.username, u.name, p.body, p.created_at
     FROM posts p
     JOIN users u ON p.user_id = u.id
     ORDER BY p.created_at DESC;
@@ -39,6 +39,7 @@ if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         $posts[] = [
             "username" => $row['username'],
+            "name" => $row['name'],
             "created_at" => $row['created_at'],
             "post" => $row['body']
         ];
