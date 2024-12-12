@@ -10,6 +10,9 @@ header('Content-Type: application/json');
 // config.php dosyasını dahil et
 require __DIR__ . '/../config.php';
 
+// Gelen veriyi JSON olarak al
+$input = json_decode(file_get_contents('php://input'), true);
+
 // Veritabanı bağlantısını oluştur
 $conn = new mysqli($servername, $username, $password, $dbname);
 
@@ -24,17 +27,67 @@ if ($conn->connect_error) {
 }
 
 // Uygulamadan gelen katsayıyı alın
-$katsayi = isset($_GET['katsayi']) ? (int)$_GET['katsayi'] : 0;
+$katsayi = isset($input['katsayi']) ? (int)$input['katsayi'] : 0;
+// Login kullanıcı adını alın
+$loginUser = isset($input['loginUser']) ? $input['loginUser'] : null;
+
+if (!$loginUser) {
+    http_response_code(400);
+    echo json_encode([
+        "status" => "error",
+        "message" => "loginUser parametresi eksik."
+    ]);
+    exit;
+}
 
 // Katsayıya göre limitleri ayarla
-$alt_limit = ($katsayi * 50) + 1;
-$ust_limit = $katsayi > 0 ? $alt_limit + 49 : 50; // Katsayı 0 ise ilk 50 gönderiyi getir
+$alt_limit = ($katsayi * 50);
+$ust_limit = 50; // Her sayfada 50 gönderi getir
 
-// SQL sorgusu: Belirli aralıktaki postları getirir
+// Login kullanıcı için user_id'yi al
+$user_id_query = "SELECT id FROM users WHERE username = ?";
+$user_stmt = $conn->prepare($user_id_query);
+if ($user_stmt === false) {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "SQL sorgusu hazırlanamıyor: " . $conn->error
+    ]);
+    exit;
+}
+
+$user_stmt->bind_param("s", $loginUser);
+$user_stmt->execute();
+$user_result = $user_stmt->get_result();
+
+if ($user_result->num_rows === 0) {
+    http_response_code(404);
+    echo json_encode([
+        "status" => "error",
+        "message" => "loginUser ile eşleşen kullanıcı bulunamadı."
+    ]);
+    exit;
+}
+
+$user_row = $user_result->fetch_assoc();
+$login_user_id = $user_row['id'];
+
+// SQL sorgusu: Belirli aralıktaki postları getirir, beğeni sayılarını ve isLiked durumunu ekler
 $sql = "
-    SELECT p.id, u.username, u.name, p.body, p.created_at
+    SELECT 
+        p.id AS post_id, 
+        u.username, 
+        u.name, 
+        p.body, 
+        p.created_at, 
+        COALESCE(COUNT(l.id), 0) AS likes_count,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
+        ) THEN true ELSE false END AS isLiked
     FROM posts p
     JOIN users u ON p.user_id = u.id
+    LEFT JOIN likes l ON p.id = l.post_id
+    GROUP BY p.id, u.username, u.name, p.body, p.created_at
     ORDER BY p.created_at DESC
     LIMIT ?, ?;
 ";
@@ -50,7 +103,7 @@ if ($stmt === false) {
 }
 
 // Parametreleri bağla ve sorguyu çalıştır
-$stmt->bind_param("ii", $alt_limit, $ust_limit);
+$stmt->bind_param("iii", $login_user_id, $alt_limit, $ust_limit);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -59,11 +112,13 @@ if ($result && $result->num_rows > 0) {
     $posts = [];
     while ($row = $result->fetch_assoc()) {
         $posts[] = [
-            "post_id" => $row['id'],
+            "post_id" => $row['post_id'],
             "username" => $row['username'],
             "name" => $row['name'],
             "created_at" => $row['created_at'],
-            "text" => $row['body']
+            "text" => $row['body'],
+            "likes_count" => (int)$row['likes_count'],
+            "isLiked" => (bool)$row['isLiked']
         ];
     }
     http_response_code(200);
