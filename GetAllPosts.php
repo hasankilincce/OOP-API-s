@@ -27,7 +27,7 @@ if ($conn->connect_error) {
 }
 
 // Uygulamadan gelen katsayıyı alın
-$katsayi = isset($input['katsayi']) ? (int)$input['katsayi'] : 0;
+$katsayi = isset($_GET['katsayi']) ? (int)$_GET['katsayi'] : 0;
 // Login kullanıcı adını alın
 $loginUser = isset($input['loginUser']) ? $input['loginUser'] : null;
 
@@ -42,7 +42,7 @@ if (!$loginUser) {
 
 // Katsayıya göre limitleri ayarla
 $alt_limit = ($katsayi * 50);
-$ust_limit = 50; // Her sayfada 50 gönderi getir
+$ust_limit = $alt_limit + 50; // Her sayfada 50 gönderi getir
 
 // Login kullanıcı için user_id'yi al
 $user_id_query = "SELECT id FROM users WHERE username = ?";
@@ -79,7 +79,7 @@ $sql = "
         u.username, 
         u.name, 
         p.body, 
-        p.created_at, 
+        DATE_FORMAT(CONVERT_TZ(p.created_at, '+00:00', '+03:00'), '%Y-%m-%d %H:%i') AS created_at, 
         COALESCE(COUNT(l.id), 0) AS likes_count,
         CASE WHEN EXISTS (
             SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
