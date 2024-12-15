@@ -10,6 +10,9 @@ header('Content-Type: application/json');
 // config.php dosyasını dahil et
 require __DIR__ . '/../config.php';
 
+// Gelen veriyi JSON olarak al
+$input = json_decode(file_get_contents('php://input'), true);
+
 // Veritabanı bağlantısını oluştur
 $conn = new mysqli($servername, $username, $password, $dbname);
 
@@ -23,95 +26,133 @@ if ($conn->connect_error) {
     exit;
 }
 
-// JSON verisini alma ve çözme
-$data = json_decode(file_get_contents('php://input'), true);
-
-// Gelen `loginUser` değerini kontrol et
-$loginUser = $data['loginUser'] ?? null;
+// Login kullanıcı adını alın
+$loginUser = isset($input['loginUser']) ? $input['loginUser'] : null;
 
 if (!$loginUser) {
     http_response_code(400);
     echo json_encode([
         "status" => "error",
-        "message" => "Lütfen geçerli bir kullanıcı adı sağlayın."
+        "message" => "loginUser parametresi eksik."
     ]);
     exit;
 }
 
-// Kullanıcının ID'sini alma sorgusu
-$sql_user = "SELECT id FROM users WHERE username = ?";
-$stmt_user = $conn->prepare($sql_user);
 
-if ($stmt_user) {
-    $stmt_user->bind_param("s", $loginUser);
-    $stmt_user->execute();
-    $result_user = $stmt_user->get_result();
-
-    if ($result_user->num_rows > 0) {
-        $user = $result_user->fetch_assoc();
-        $user_id = $user['id'];
-
-        // Kullanıcının ve gönderiyi paylaşan kişilerin bilgilerini alma sorgusu
-        $sql_posts = "
-            SELECT u.username, u.name, p.body, p.created_at 
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.user_id = ?
-            ORDER BY p.created_at DESC
-        ";
-        $stmt_posts = $conn->prepare($sql_posts);
-
-        if ($stmt_posts) {
-            $stmt_posts->bind_param("i", $user_id);
-            $stmt_posts->execute();
-            $result_posts = $stmt_posts->get_result();
-
-            if ($result_posts->num_rows > 0) {
-                $posts = [];
-                while ($row = $result_posts->fetch_assoc()) {
-                    $posts[] = [
-                        "username" => $row['username'],
-                        "name" => $row['name'],
-                        "body" => $row['body'],
-                        "created_at" => $row['created_at']
-                    ];
-                }
-                http_response_code(200);
-                echo json_encode([
-                    "status" => "success",
-                    "data" => $posts
-                ]);
-            } else {
-                http_response_code(404);
-                echo json_encode([
-                    "status" => "error",
-                    "message" => "Bu kullanıcıya ait gönderi bulunamadı."
-                ]);
-            }
-            $stmt_posts->close();
-        } else {
-            http_response_code(500);
-            echo json_encode([
-                "status" => "error",
-                "message" => "Gönderiler sorgusu hazırlanırken hata oluştu: " . $conn->error
-            ]);
-        }
-    } else {
-        http_response_code(404);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Kullanıcı bulunamadı."
-        ]);
-    }
-    $stmt_user->close();
-} else {
+// Login kullanıcı için user_id'yi al
+$user_id_query = "SELECT id FROM users WHERE username = ?";
+$user_stmt = $conn->prepare($user_id_query);
+if ($user_stmt === false) {
     http_response_code(500);
     echo json_encode([
         "status" => "error",
-        "message" => "Kullanıcı sorgusu hazırlanırken hata oluştu: " . $conn->error
+        "message" => "SQL sorgusu hazırlanamıyor: " . $conn->error
+    ]);
+    exit;
+}
+
+$user_stmt->bind_param("s", $loginUser);
+$user_stmt->execute();
+$user_result = $user_stmt->get_result();
+
+if ($user_result->num_rows === 0) {
+    http_response_code(404);
+    echo json_encode([
+        "status" => "error",
+        "message" => "loginUser ile eşleşen kullanıcı bulunamadı."
+    ]);
+    exit;
+}
+
+$user_row = $user_result->fetch_assoc();
+$login_user_id = $user_row['id'];
+
+// SQL sorgusu: Belirli aralıktaki postları getirir, beğeni sayılarını ve isLiked durumunu ekler
+$sql = "
+SELECT 
+    p.id AS post_id, 
+    u.username, 
+    u.name, 
+    p.body, 
+    p.created_at, 
+    COALESCE(COUNT(l.id), 0) AS likes_count,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM likes l2 
+            WHERE l2.post_id = p.id AND l2.user_id = ?
+        ) THEN true 
+        ELSE false 
+    END AS isLiked
+FROM posts p
+JOIN users u ON p.user_id = u.id
+LEFT JOIN likes l ON p.id = l.post_id
+WHERE p.user_id = ?
+GROUP BY p.id, u.username, u.name, p.body, p.created_at
+ORDER BY p.created_at DESC;
+";
+
+$stmt = $conn->prepare($sql);
+if ($stmt === false) {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "SQL sorgusu hazırlanamıyor: " . $conn->error
+    ]);
+    exit;
+}
+
+// Parametreleri bağla ve sorguyu çalıştır
+$stmt->bind_param("ii", $login_user_id, $login_user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+function formatTimeDifference($datetime) {
+    $now = new DateTime();
+    $postTime = new DateTime($datetime);
+    $interval = $now->diff($postTime);
+
+    if ($interval->y > 0 || $interval->m > 0 || $interval->d > 1) {
+        // Tarihi "14 Aralık 2024" gibi dön
+        return $postTime->format('d F Y');
+    } elseif ($interval->d === 1) {
+        return 'yesterday';
+    } elseif ($interval->h >= 1) {
+        return $interval->h . ' hours ago';
+    } elseif ($interval->i >= 1) {
+        return $interval->i . ' minutes ago';
+    } else {
+        return 'just now';
+    }
+}
+
+// Sonuçları kontrol et ve JSON olarak döndür
+if ($result && $result->num_rows > 0) {
+    $posts = [];
+    while ($row = $result->fetch_assoc()) {
+        $posts[] = [
+            "post_id" => $row['post_id'],
+            "username" => $row['username'],
+            "name" => $row['name'],
+            "created_at" => formatTimeDifference($row['created_at']),
+            "text" => $row['body'],
+            "likes_count" => (int)$row['likes_count'],
+            "isLiked" => (bool)$row['isLiked']
+        ];
+    }
+    http_response_code(200);
+    echo json_encode([
+        "status" => "success",
+        "data" => $posts
+    ]);
+} else {
+    http_response_code(404);
+    echo json_encode([
+        "status" => "error",
+        "message" => "Hiç bir gönderi bulunamadı."
     ]);
 }
 
 // Veritabanı bağlantısını kapat
+$stmt->close();
 $conn->close();
 ?>
