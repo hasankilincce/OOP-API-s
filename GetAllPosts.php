@@ -79,7 +79,7 @@ $sql = "
         u.username, 
         u.name, 
         p.body, 
-        DATE_FORMAT(CONVERT_TZ(p.created_at, '+00:00', '+03:00'), '%Y-%m-%d %H:%i') AS created_at, 
+        p.created_at, 
         COALESCE(COUNT(l.id), 0) AS likes_count,
         CASE WHEN EXISTS (
             SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
@@ -107,6 +107,25 @@ $stmt->bind_param("iii", $login_user_id, $alt_limit, $ust_limit);
 $stmt->execute();
 $result = $stmt->get_result();
 
+function formatTimeDifference($datetime) {
+    $now = new DateTime();
+    $postTime = new DateTime($datetime);
+    $interval = $now->diff($postTime);
+
+    if ($interval->y > 0 || $interval->m > 0 || $interval->d > 1) {
+        // Tarihi "14 Aralık 2024" gibi dön
+        return $postTime->format('d F Y');
+    } elseif ($interval->d === 1) {
+        return 'yesterday';
+    } elseif ($interval->h >= 1) {
+        return $interval->h . ' hours ago';
+    } elseif ($interval->i >= 1) {
+        return $interval->i . ' minutes ago';
+    } else {
+        return 'just now';
+    }
+}
+
 // Sonuçları kontrol et ve JSON olarak döndür
 if ($result && $result->num_rows > 0) {
     $posts = [];
@@ -115,7 +134,7 @@ if ($result && $result->num_rows > 0) {
             "post_id" => $row['post_id'],
             "username" => $row['username'],
             "name" => $row['name'],
-            "created_at" => $row['created_at'],
+            "created_at" => formatTimeDifference($row['created_at']),
             "text" => $row['body'],
             "likes_count" => (int)$row['likes_count'],
             "isLiked" => (bool)$row['isLiked']
