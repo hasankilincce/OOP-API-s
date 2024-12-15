@@ -28,14 +28,15 @@ if ($conn->connect_error) {
 
 // Uygulamadan gelen katsayıyı alın
 $katsayi = isset($_GET['katsayi']) ? (int)$_GET['katsayi'] : 0;
-// Login kullanıcı adını alın
+// loginUser ve targetUser adlarını alın
 $loginUser = isset($input['loginUser']) ? $input['loginUser'] : null;
+$targetUser = isset($input['targetUser']) ? $input['targetUser'] : null;
 
-if (!$loginUser) {
+if (!$loginUser || !$targetUser) {
     http_response_code(400);
     echo json_encode([
         "status" => "error",
-        "message" => "loginUser parametresi eksik."
+        "message" => "loginUser ve targetUser parametreleri eksik."
     ]);
     exit;
 }
@@ -44,7 +45,7 @@ if (!$loginUser) {
 $alt_limit = ($katsayi * 50);
 $ust_limit = $alt_limit + 50; // Her sayfada 50 gönderi getir
 
-// Login kullanıcı için user_id'yi al
+// loginUser id'sini al
 $user_id_query = "SELECT id FROM users WHERE username = ?";
 $user_stmt = $conn->prepare($user_id_query);
 if ($user_stmt === false) {
@@ -72,7 +73,34 @@ if ($user_result->num_rows === 0) {
 $user_row = $user_result->fetch_assoc();
 $login_user_id = $user_row['id'];
 
-// SQL sorgusu: Belirli aralıktaki postları getirir, beğeni sayılarını ve isLiked durumunu ekler
+// targetUser id'sini al
+$target_user_stmt = $conn->prepare($user_id_query);
+if ($target_user_stmt === false) {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "SQL sorgusu hazırlanamıyor: " . $conn->error
+    ]);
+    exit;
+}
+
+$target_user_stmt->bind_param("s", $targetUser);
+$target_user_stmt->execute();
+$target_user_result = $target_user_stmt->get_result();
+
+if ($target_user_result->num_rows === 0) {
+    http_response_code(404);
+    echo json_encode([
+        "status" => "error",
+        "message" => "targetUser ile eşleşen kullanıcı bulunamadı."
+    ]);
+    exit;
+}
+
+$target_row = $target_user_result->fetch_assoc();
+$target_user_id = $target_row['id'];
+
+// targetUser'ın postlarını al ve isLiked durumunu kontrol et
 $sql = "
 SELECT 
     p.id AS post_id, 
@@ -108,7 +136,7 @@ if ($stmt === false) {
 }
 
 // Parametreleri bağla ve sorguyu çalıştır
-$stmt->bind_param("iiii", $login_user_id, $login_user_id, $alt_limit, $ust_limit);
+$stmt->bind_param("iiii", $login_user_id, $target_user_id, $alt_limit, $ust_limit);
 $stmt->execute();
 $result = $stmt->get_result();
 
