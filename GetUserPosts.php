@@ -26,6 +26,8 @@ if ($conn->connect_error) {
     exit;
 }
 
+// Uygulamadan gelen katsayıyı alın
+$katsayi = isset($_GET['katsayi']) ? (int)$_GET['katsayi'] : 0;
 // Login kullanıcı adını alın
 $loginUser = isset($input['loginUser']) ? $input['loginUser'] : null;
 
@@ -38,6 +40,9 @@ if (!$loginUser) {
     exit;
 }
 
+// Katsayıya göre limitleri ayarla
+$alt_limit = ($katsayi * 50);
+$ust_limit = $alt_limit + 50; // Her sayfada 50 gönderi getir
 
 // Login kullanıcı için user_id'yi al
 $user_id_query = "SELECT id FROM users WHERE username = ?";
@@ -88,7 +93,8 @@ JOIN users u ON p.user_id = u.id
 LEFT JOIN likes l ON p.id = l.post_id
 WHERE p.user_id = ?
 GROUP BY p.id, u.username, u.name, p.body, p.created_at
-ORDER BY p.created_at DESC;
+ORDER BY p.created_at DESC
+LIMIT ?, ?;
 ";
 
 $stmt = $conn->prepare($sql);
@@ -102,7 +108,7 @@ if ($stmt === false) {
 }
 
 // Parametreleri bağla ve sorguyu çalıştır
-$stmt->bind_param("ii", $login_user_id, $login_user_id);
+$stmt->bind_param("iiii", $login_user_id, $login_user_id, $alt_limit, $ust_limit);
 $stmt->execute();
 $result = $stmt->get_result();
 
