@@ -49,7 +49,8 @@ $sql = "
     SELECT 
         c.id AS comment_id, 
         u.username, 
-        u.name, 
+        u.name,
+        u.pp_id,
         c.content, 
         c.created_at
     FROM 
@@ -105,6 +106,7 @@ if ($result && $result->num_rows > 0) {
         $comments[] = [
             "comment_id" => $row['comment_id'],
             "username" => $row['username'],
+            "pp_id" => $row['pp_id'],
             "name" => $row['name'],
             "content" => $row['content'],
             "created_at" => formatTimeDifference($row['created_at'])
