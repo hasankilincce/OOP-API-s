@@ -78,6 +78,7 @@ $sql = "
         p.id AS post_id, 
         u.username, 
         u.name, 
+        u.pp_id,
         p.body, 
         p.created_at, 
         COALESCE(COUNT(l.id), 0) AS likes_count,
@@ -133,6 +134,7 @@ if ($result && $result->num_rows > 0) {
         $posts[] = [
             "post_id" => $row['post_id'],
             "username" => $row['username'],
+            "pp_id" => $row['pp_id'],
             "name" => $row['name'],
             "created_at" => formatTimeDifference($row['created_at']),
             "text" => $row['body'],
