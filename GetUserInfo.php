@@ -26,13 +26,24 @@ if ($conn->connect_error) {
 // JSON verisini alma ve çözme
 $data = json_decode(file_get_contents('php://input'), true);
 
-// `loginUser` kontrolü
+// `loginUser` ve `targetUser` kontrolü
 $loginUser = $data['loginUser'] ?? null;
+$targetUser = $data['targetUser'] ?? null;
+
 if (!$loginUser) {
     http_response_code(400);
     echo json_encode([
         "status" => "error",
         "message" => "Geçerli bir kullanıcı adı sağlamalısınız."
+    ]);
+    exit;
+}
+
+if (!$targetUser) {
+    http_response_code(400);
+    echo json_encode([
+        "status" => "error",
+        "message" => "Geçerli bir hedef kullanıcı adı sağlamalısınız."
     ]);
     exit;
 }
@@ -70,6 +81,60 @@ if ($stmtUser) {
         "message" => "Kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
     ]);
     exit;
+}
+
+// Hedef kullanıcı bilgilerini bulma
+$sqlTargetUser = "SELECT id FROM users WHERE username = ?";
+$stmtTargetUser = $conn->prepare($sqlTargetUser);
+
+if ($stmtTargetUser) {
+    $stmtTargetUser->bind_param("s", $targetUser);
+    $stmtTargetUser->execute();
+    $resultTargetUser = $stmtTargetUser->get_result();
+
+    if ($resultTargetUser->num_rows > 0) {
+        $target_user = $resultTargetUser->fetch_assoc();
+        $target_user_id = $target_user['id'];
+    } else {
+        http_response_code(404);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Hedef kullanıcı bulunamadı."
+        ]);
+        exit;
+    }
+    $stmtTargetUser->close();
+} else {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "Hedef kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
+    ]);
+    exit;
+}
+
+// LoginUser ve TargetUser eşit mi kontrolü
+if ($loginUser === $targetUser) {
+    $isFollowing = null;
+} else {
+    // LoginUser, TargetUser'ı takip ediyor mu kontrolü
+    $sqlCheckFollow = "SELECT COUNT(*) AS is_following FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
+    $stmtCheckFollow = $conn->prepare($sqlCheckFollow);
+
+    if ($stmtCheckFollow) {
+        $stmtCheckFollow->bind_param("ii", $current_user_id, $target_user_id);
+        $stmtCheckFollow->execute();
+        $resultCheckFollow = $stmtCheckFollow->get_result();
+        $isFollowing = $resultCheckFollow->fetch_assoc()['is_following'] > 0;
+        $stmtCheckFollow->close();
+    } else {
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Takip durumu sorgusu sırasında hata oluştu: " . $conn->error
+        ]);
+        exit;
+    }
 }
 
 // Takip edilen kullanıcı sayısını bulma
@@ -116,7 +181,8 @@ echo json_encode([
     "status" => "success",
     "user_info" => $user_info,
     "following_count" => $following_count,
-    "follower_count" => $follower_count
+    "follower_count" => $follower_count,
+    "is_following" => $isFollowing
 ]);
 
 // Veritabanı bağlantısını kapat
