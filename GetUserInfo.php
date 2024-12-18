@@ -30,25 +30,16 @@ $data = json_decode(file_get_contents('php://input'), true);
 $loginUser = $data['loginUser'] ?? null;
 $targetUser = $data['targetUser'] ?? null;
 
-if (!$loginUser) {
+if (!$loginUser || !$targetUser) {
     http_response_code(400);
     echo json_encode([
         "status" => "error",
-        "message" => "Geçerli bir kullanıcı adı sağlamalısınız."
+        "message" => "Geçerli bir loginUser ve targetUser sağlanmalıdır."
     ]);
     exit;
 }
 
-if (!$targetUser) {
-    http_response_code(400);
-    echo json_encode([
-        "status" => "error",
-        "message" => "Geçerli bir hedef kullanıcı adı sağlamalısınız."
-    ]);
-    exit;
-}
-
-// Hedef kullanıcı bilgilerini bulma (Şimdi loginUser yerine kullanılıyor)
+// Hedef kullanıcı bilgilerini bulma
 $sqlTargetUser = "SELECT id, name, bio, pp_id FROM users WHERE username = ?";
 $stmtTargetUser = $conn->prepare($sqlTargetUser);
 
@@ -60,7 +51,7 @@ if ($stmtTargetUser) {
     if ($resultTargetUser->num_rows > 0) {
         $user = $resultTargetUser->fetch_assoc();
         $current_user_id = $user['id'];
-        $user_info = [
+        $data = [
             "name" => $user['name'],
             "bio" => $user['bio'],
             "pp_id" => $user['pp_id']
@@ -83,7 +74,7 @@ if ($stmtTargetUser) {
     exit;
 }
 
-// LoginUser bilgilerini bulma (Şimdi targetUser yerine kullanılıyor)
+// LoginUser bilgilerini bulma
 $sqlUser = "SELECT id FROM users WHERE username = ?";
 $stmtUser = $conn->prepare($sqlUser);
 
@@ -93,13 +84,12 @@ if ($stmtUser) {
     $resultUser = $stmtUser->get_result();
 
     if ($resultUser->num_rows > 0) {
-        $target_user = $resultUser->fetch_assoc();
-        $target_user_id = $target_user['id'];
+        $login_user_id = $resultUser->fetch_assoc()['id'];
     } else {
         http_response_code(404);
         echo json_encode([
             "status" => "error",
-            "message" => "Kullanıcı bulunamadı."
+            "message" => "Login kullanıcı bulunamadı."
         ]);
         exit;
     }
@@ -108,21 +98,19 @@ if ($stmtUser) {
     http_response_code(500);
     echo json_encode([
         "status" => "error",
-        "message" => "Kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
+        "message" => "Login kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
     ]);
     exit;
 }
 
-// TargetUser ve LoginUser eşit mi kontrolü
-if ($loginUser === $targetUser) {
-    $isFollowing = null;
-} else {
-    // TargetUser, LoginUser'ı takip ediyor mu kontrolü
+// Takip durumu kontrolü
+$isFollowing = null;
+if ($loginUser !== $targetUser) {
     $sqlCheckFollow = "SELECT COUNT(*) AS is_following FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
     $stmtCheckFollow = $conn->prepare($sqlCheckFollow);
 
     if ($stmtCheckFollow) {
-        $stmtCheckFollow->bind_param("ii", $target_user_id, $current_user_id);
+        $stmtCheckFollow->bind_param("ii", $login_user_id, $current_user_id);
         $stmtCheckFollow->execute();
         $resultCheckFollow = $stmtCheckFollow->get_result();
         $isFollowing = $resultCheckFollow->fetch_assoc()['is_following'] > 0;
@@ -137,12 +125,13 @@ if ($loginUser === $targetUser) {
     }
 }
 
-// Takip edilen kullanıcı sayısını bulma
+// Takip edilen kullanıcı sayısı
 $sqlFollowingCount = "SELECT COUNT(*) AS following_count FROM follows WHERE following_user_id = ?";
+$following_count = 0;
 $stmtFollowingCount = $conn->prepare($sqlFollowingCount);
 
 if ($stmtFollowingCount) {
-    $stmtFollowingCount->bind_param("i", $target_user_id);
+    $stmtFollowingCount->bind_param("i", $current_user_id);
     $stmtFollowingCount->execute();
     $resultFollowingCount = $stmtFollowingCount->get_result();
     $following_count = $resultFollowingCount->fetch_assoc()['following_count'];
@@ -156,12 +145,13 @@ if ($stmtFollowingCount) {
     exit;
 }
 
-// Takipçi sayısını bulma
+// Takipçi sayısı
 $sqlFollowerCount = "SELECT COUNT(*) AS follower_count FROM follows WHERE followed_user_id = ?";
+$follower_count = 0;
 $stmtFollowerCount = $conn->prepare($sqlFollowerCount);
 
 if ($stmtFollowerCount) {
-    $stmtFollowerCount->bind_param("i", $target_user_id);
+    $stmtFollowerCount->bind_param("i", $current_user_id);
     $stmtFollowerCount->execute();
     $resultFollowerCount = $stmtFollowerCount->get_result();
     $follower_count = $resultFollowerCount->fetch_assoc()['follower_count'];
@@ -179,10 +169,11 @@ if ($stmtFollowerCount) {
 http_response_code(200);
 echo json_encode([
     "status" => "success",
-    "user_info" => $user_info,
-    "following_count" => $following_count,
-    "follower_count" => $follower_count,
-    "is_following" => $isFollowing
+    "data" => array_merge($data, [
+        "following_count" => $following_count,
+        "follower_count" => $follower_count,
+        "is_following" => $isFollowing
+    ])
 ]);
 
 // Veritabanı bağlantısını kapat
