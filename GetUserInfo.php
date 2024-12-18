@@ -48,43 +48,8 @@ if (!$targetUser) {
     exit;
 }
 
-// Kullanıcı bilgilerini bulma
-$sqlUser = "SELECT id, name, bio, pp_id FROM users WHERE username = ?";
-$stmtUser = $conn->prepare($sqlUser);
-
-if ($stmtUser) {
-    $stmtUser->bind_param("s", $loginUser);
-    $stmtUser->execute();
-    $resultUser = $stmtUser->get_result();
-
-    if ($resultUser->num_rows > 0) {
-        $user = $resultUser->fetch_assoc();
-        $current_user_id = $user['id'];
-        $user_info = [
-            "name" => $user['name'],
-            "bio" => $user['bio'],
-            "pp_id" => $user['pp_id']
-        ];
-    } else {
-        http_response_code(404);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Kullanıcı bulunamadı."
-        ]);
-        exit;
-    }
-    $stmtUser->close();
-} else {
-    http_response_code(500);
-    echo json_encode([
-        "status" => "error",
-        "message" => "Kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
-    ]);
-    exit;
-}
-
-// Hedef kullanıcı bilgilerini bulma
-$sqlTargetUser = "SELECT id FROM users WHERE username = ?";
+// Hedef kullanıcı bilgilerini bulma (Şimdi loginUser yerine kullanılıyor)
+$sqlTargetUser = "SELECT id, name, bio, pp_id FROM users WHERE username = ?";
 $stmtTargetUser = $conn->prepare($sqlTargetUser);
 
 if ($stmtTargetUser) {
@@ -93,8 +58,13 @@ if ($stmtTargetUser) {
     $resultTargetUser = $stmtTargetUser->get_result();
 
     if ($resultTargetUser->num_rows > 0) {
-        $target_user = $resultTargetUser->fetch_assoc();
-        $target_user_id = $target_user['id'];
+        $user = $resultTargetUser->fetch_assoc();
+        $current_user_id = $user['id'];
+        $user_info = [
+            "name" => $user['name'],
+            "bio" => $user['bio'],
+            "pp_id" => $user['pp_id']
+        ];
     } else {
         http_response_code(404);
         echo json_encode([
@@ -113,16 +83,46 @@ if ($stmtTargetUser) {
     exit;
 }
 
-// LoginUser ve TargetUser eşit mi kontrolü
+// LoginUser bilgilerini bulma (Şimdi targetUser yerine kullanılıyor)
+$sqlUser = "SELECT id FROM users WHERE username = ?";
+$stmtUser = $conn->prepare($sqlUser);
+
+if ($stmtUser) {
+    $stmtUser->bind_param("s", $loginUser);
+    $stmtUser->execute();
+    $resultUser = $stmtUser->get_result();
+
+    if ($resultUser->num_rows > 0) {
+        $target_user = $resultUser->fetch_assoc();
+        $target_user_id = $target_user['id'];
+    } else {
+        http_response_code(404);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Kullanıcı bulunamadı."
+        ]);
+        exit;
+    }
+    $stmtUser->close();
+} else {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "Kullanıcı sorgusu sırasında hata oluştu: " . $conn->error
+    ]);
+    exit;
+}
+
+// TargetUser ve LoginUser eşit mi kontrolü
 if ($loginUser === $targetUser) {
     $isFollowing = null;
 } else {
-    // LoginUser, TargetUser'ı takip ediyor mu kontrolü
+    // TargetUser, LoginUser'ı takip ediyor mu kontrolü
     $sqlCheckFollow = "SELECT COUNT(*) AS is_following FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
     $stmtCheckFollow = $conn->prepare($sqlCheckFollow);
 
     if ($stmtCheckFollow) {
-        $stmtCheckFollow->bind_param("ii", $current_user_id, $target_user_id);
+        $stmtCheckFollow->bind_param("ii", $target_user_id, $current_user_id);
         $stmtCheckFollow->execute();
         $resultCheckFollow = $stmtCheckFollow->get_result();
         $isFollowing = $resultCheckFollow->fetch_assoc()['is_following'] > 0;
@@ -142,7 +142,7 @@ $sqlFollowingCount = "SELECT COUNT(*) AS following_count FROM follows WHERE foll
 $stmtFollowingCount = $conn->prepare($sqlFollowingCount);
 
 if ($stmtFollowingCount) {
-    $stmtFollowingCount->bind_param("i", $current_user_id);
+    $stmtFollowingCount->bind_param("i", $target_user_id);
     $stmtFollowingCount->execute();
     $resultFollowingCount = $stmtFollowingCount->get_result();
     $following_count = $resultFollowingCount->fetch_assoc()['following_count'];
@@ -161,7 +161,7 @@ $sqlFollowerCount = "SELECT COUNT(*) AS follower_count FROM follows WHERE follow
 $stmtFollowerCount = $conn->prepare($sqlFollowerCount);
 
 if ($stmtFollowerCount) {
-    $stmtFollowerCount->bind_param("i", $current_user_id);
+    $stmtFollowerCount->bind_param("i", $target_user_id);
     $stmtFollowerCount->execute();
     $resultFollowerCount = $stmtFollowerCount->get_result();
     $follower_count = $resultFollowerCount->fetch_assoc()['follower_count'];
