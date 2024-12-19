@@ -87,12 +87,7 @@ if ($stmt) {
                         "mutual_followers_count" => $row["mutual_followers_count"]
                     ];
                 }
-
-                echo json_encode([
-                    "status" => "success",
-                    "data" => $nonFollowedUsers
-                ]);
-            } else {
+            } if (10 > $result2->num_rows) {
                 // Ortak takipçi yoksa rastgele kullanıcılar döndür
                 $sql = "
                     SELECT username, name, pp_id 
@@ -118,11 +113,6 @@ if ($stmt) {
                                 "mutual_followers_count" => 0
                             ];
                         }
-
-                        echo json_encode([
-                            "status" => "success",
-                            "data" => $randomUsers
-                        ]);
                     } else {
                         http_response_code(404);
                         echo json_encode([
@@ -140,6 +130,11 @@ if ($stmt) {
                     ]);
                 }
             }
+            
+            echo json_encode([
+            "status" => "success",
+            "data" => $nonFollowedUsers + $randomUsers
+        ]);
 
             $stmt2->close();
         } else {
