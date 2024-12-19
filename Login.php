@@ -32,7 +32,7 @@ if (!empty($loginUser) && !empty($loginPass)) {
     }
 
     // SQL sorgusunu prepared statement ile oluştur
-    $sql = "SELECT password FROM users WHERE username = ?";
+    $sql = "SELECT password FROM users WHERE BINARY username = ?";
     $stmt = $conn->prepare($sql);
 
     if ($stmt) {
