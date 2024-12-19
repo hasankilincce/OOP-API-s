@@ -17,7 +17,7 @@ $data = json_decode(file_get_contents('php://input'), true);
 $loginUser = $data['loginUser'] ?? $_POST['loginUser'] ?? null;
 $postContent = $data['postContent'] ?? $_POST['postContent'] ?? null;
 
-if (empty($loginUser) || empty($postContent)) {
+if (empty($loginUser) || empty($postContent || trim($postContent) === '')) {
     http_response_code(400);
     echo json_encode([
         "status" => "error",
@@ -60,7 +60,7 @@ if ($stmt1) {
     }
 
     // Hashtag'leri ayıkla
-    preg_match_all('/#(\w+)/', $postContent, $matches);
+    preg_match_all('/#([a-zA-Z0-9çÇğĞıİöÖşŞüÜ]+)/u', $postContent, $matches);
     $hashtags = $matches[1]; // Sadece hashtag isimleri alınır
 
     // Kategori ID'sini varsayılan olarak null yap
