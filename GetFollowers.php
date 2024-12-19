@@ -69,7 +69,7 @@ if ($stmtUser) {
 
 // Sizi takip eden kullanıcıları getir
 $sqlFollowers = "
-    SELECT u.username, f.created_at
+    SELECT u.username, u.name, u.pp_id, u.bio
     FROM follows f
     JOIN users u ON f.following_user_id = u.id
     WHERE f.followed_user_id = ?
@@ -86,7 +86,9 @@ if ($stmtFollowers) {
     while ($row = $resultFollowers->fetch_assoc()) {
         $followers[] = [
             "username" => $row['username'],
-            "followed_at" => $row['created_at']
+            "name" => $row['name'],
+            "pp_id" => $row['pp_id'],
+            "bio" => $row['bio']
         ];
     }
 
@@ -97,14 +99,12 @@ if ($stmtFollowers) {
         http_response_code(200);
         echo json_encode([
             "status" => "success",
-            "count" => $followersCount, // Takipçi sayısı
             "data" => $followers       // Takipçi bilgileri
         ]);
     } else {
         http_response_code(404);
         echo json_encode([
             "status" => "error",
-            "count" => 0, // Takipçi sayısı sıfır
             "message" => "Sizi takip eden kullanıcı bulunamadı."
         ]);
     }
