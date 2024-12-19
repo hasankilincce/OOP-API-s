@@ -106,9 +106,11 @@ SELECT
     p.id AS post_id, 
     u.username, 
     u.name, 
+    u.pp_id,
     p.body, 
     p.created_at, 
-    COALESCE(COUNT(l.id), 0) AS likes_count,
+    COALESCE(COUNT(DISTINCT l.id), 0) AS likes_count,
+    COALESCE(COUNT(DISTINCT c.id), 0) AS comments_count,
     CASE 
         WHEN EXISTS (
             SELECT 1 FROM likes l2 
@@ -119,8 +121,9 @@ SELECT
 FROM posts p
 JOIN users u ON p.user_id = u.id
 LEFT JOIN likes l ON p.id = l.post_id
+LEFT JOIN comments c ON p.id = c.post_id
 WHERE p.user_id = ?
-GROUP BY p.id, u.username, u.name, p.body, p.created_at
+GROUP BY p.id, u.username, u.name, u.pp_id, p.body, p.created_at
 ORDER BY p.created_at DESC
 LIMIT ?, ?;
 ";
@@ -166,10 +169,12 @@ if ($result && $result->num_rows > 0) {
         $posts[] = [
             "post_id" => $row['post_id'],
             "username" => $row['username'],
+            "pp_id" => $row['pp_id'],
             "name" => $row['name'],
             "created_at" => formatTimeDifference($row['created_at']),
             "text" => $row['body'],
             "likes_count" => (int)$row['likes_count'],
+            "comments_count" => (int)$row['comments_count'],
             "isLiked" => (bool)$row['isLiked']
         ];
     }
