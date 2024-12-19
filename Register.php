@@ -41,7 +41,7 @@ if ($conn->connect_error) {
 }
 
 // Kullanıcı adını kontrol et
-$sql = "SELECT username FROM users WHERE username = ?";
+$sql = "SELECT username FROM users WHERE BINARY username = ?";
 $stmt = $conn->prepare($sql);
 
 if ($stmt) {
