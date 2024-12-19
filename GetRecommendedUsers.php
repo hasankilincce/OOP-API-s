@@ -68,7 +68,7 @@ if ($stmt) {
             AND f2.following_user_id = ?
             GROUP BY u.id
             ORDER BY mutual_followers_count DESC
-            LIMIT 10
+            LIMIT 5
         ";
         $stmt2 = $conn->prepare($sql);
 
@@ -87,14 +87,14 @@ if ($stmt) {
                         "mutual_followers_count" => $row["mutual_followers_count"]
                     ];
                 }
-            } if (10 > $result2->num_rows) {
+            } if (5 > $result2->num_rows) {
                 // Ortak takipçi yoksa rastgele kullanıcılar döndür
                 $sql = "
                     SELECT username, name, pp_id 
                     FROM users 
                     WHERE id != ? 
                     ORDER BY RAND() 
-                    LIMIT 10
+                    LIMIT 5
                 ";
                 $stmt3 = $conn->prepare($sql);
 
