@@ -104,7 +104,7 @@ if ($stmtUser) {
 }
 
 // Takip durumu kontrolü
-$isFollowing = null;
+$isFollowing = false;
 if ($loginUser !== $targetUser) {
     $sqlCheckFollow = "SELECT COUNT(*) AS is_following FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
     $stmtCheckFollow = $conn->prepare($sqlCheckFollow);
