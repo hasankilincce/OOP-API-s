@@ -82,12 +82,14 @@ $sql = "
         p.body, 
         p.created_at, 
         COALESCE(COUNT(l.id), 0) AS likes_count,
+        COALESCE(COUNT(c.id), 0) AS comment_count,
         CASE WHEN EXISTS (
             SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
         ) THEN true ELSE false END AS isLiked
     FROM posts p
     JOIN users u ON p.user_id = u.id
     LEFT JOIN likes l ON p.id = l.post_id
+    LEFT JOIN comments c ON p.id = c.post_id
     GROUP BY p.id, u.username, u.name, p.body, p.created_at
     ORDER BY p.created_at DESC
     LIMIT ?, ?;
@@ -139,6 +141,7 @@ if ($result && $result->num_rows > 0) {
             "created_at" => formatTimeDifference($row['created_at']),
             "text" => $row['body'],
             "likes_count" => (int)$row['likes_count'],
+            "comment_count" => (int)$row['comment_count'],
             "isLiked" => (bool)$row['isLiked']
         ];
     }
