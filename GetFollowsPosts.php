@@ -118,17 +118,17 @@ $sql = "
         u.pp_id,
         p.body, 
         p.created_at, 
-        COALESCE(COUNT(c.id), 0) AS comments_count,
-        COALESCE(COUNT(l.id), 0) AS likes_count,
+        COALESCE(COUNT(DISTINCT c.id), 0) AS comments_count,
+        COALESCE(COUNT(DISTINCT l.id), 0) AS likes_count,
         CASE WHEN EXISTS (
             SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
         ) THEN true ELSE false END AS isLiked
     FROM posts p
     JOIN users u ON p.user_id = u.id
-    LEFT JOIN likes l ON p.id = l.post_id
-    LEFT JOIN likes c ON p.id = c.post_id
+    LEFT JOIN comments c ON p.id = c.post_id -- Yorumlar için
+    LEFT JOIN likes l ON p.id = l.post_id   -- Beğeniler için
     WHERE p.user_id IN ($placeholders)
-    GROUP BY p.id, u.username, u.name, p.body, p.created_at
+    GROUP BY p.id, u.username, u.name, p.body, p.created_at, pp_id
     ORDER BY p.created_at DESC
     LIMIT ?, ?;
 ";
