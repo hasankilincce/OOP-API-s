@@ -86,10 +86,7 @@ if (!isset($followedUserId)) {
 }
 
 // Daha önce takip edilmiş mi kontrol et
-$sqlCheckFollow = "
-    SELECT id FROM follows 
-    WHERE following_user_id = ? AND followed_user_id = ?
-";
+$sqlCheckFollow = "SELECT id FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
 $stmtCheck = $conn->prepare($sqlCheckFollow);
 
 if ($stmtCheck) {
@@ -98,16 +95,42 @@ if ($stmtCheck) {
     $stmtCheck->store_result();
 
     if ($stmtCheck->num_rows > 0) {
-        http_response_code(400);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Zaten bu kullanıcıyı takip ediyorsunuz!"
-        ]);
+        // Takip varsa, takipten çıkar
         $stmtCheck->close();
-        $conn->close();
-        exit;
+        $sqlDelete = "DELETE FROM follows WHERE following_user_id = ? AND followed_user_id = ?";
+        $stmtDelete = $conn->prepare($sqlDelete);
+        $stmtDelete->bind_param("ii", $loginUserId, $followedUserId);
+
+        if ($stmtDelete->execute()) {
+            $message = "Takipten çıkıldı!";
+        } else {
+            http_response_code(500);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Takipten çıkma sırasında hata oluştu: " . $conn->error
+            ]);
+            exit;
+        }
+        $stmtDelete->close();
+    } else {
+        // Takip yoksa, takip et
+        $stmtCheck->close();
+        $sqlFollow = "INSERT INTO follows (following_user_id, followed_user_id, created_at) VALUES (?, ?, NOW() + INTERVAL 3 HOUR)";
+        $stmtFollow = $conn->prepare($sqlFollow);
+        $stmtFollow->bind_param("ii", $loginUserId, $followedUserId);
+
+        if ($stmtFollow->execute()) {
+            $message = "Takip edildi!";
+        } else {
+            http_response_code(500);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Takip işlemi sırasında hata oluştu: " . $conn->error
+            ]);
+            exit;
+        }
+        $stmtFollow->close();
     }
-    $stmtCheck->close();
 } else {
     http_response_code(500);
     echo json_encode([
@@ -117,36 +140,12 @@ if ($stmtCheck) {
     exit;
 }
 
-// Takip ilişkisini ekle
-$sqlFollow = "
-    INSERT INTO follows (following_user_id, followed_user_id, created_at)
-    VALUES (?, ?, NOW())
-";
-$stmtFollow = $conn->prepare($sqlFollow);
-
-if ($stmtFollow) {
-    $stmtFollow->bind_param("ii", $loginUserId, $followedUserId);
-    if ($stmtFollow->execute()) {
-        http_response_code(201); // Created
-        echo json_encode([
-            "status" => "success",
-            "message" => "Kullanıcı başarıyla takip edildi!"
-        ]);
-    } else {
-        http_response_code(500);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Takip işlemi sırasında hata oluştu: " . $conn->error
-        ]);
-    }
-    $stmtFollow->close();
-} else {
-    http_response_code(500);
-    echo json_encode([
-        "status" => "error",
-        "message" => "Sorgu hatası: " . $conn->error
-    ]);
-}
+// Yanıtı döndür
+http_response_code(200);
+echo json_encode([
+    "status" => "success",
+    "message" => $message
+]);
 
 // Veritabanı bağlantısını kapat
 $conn->close();
