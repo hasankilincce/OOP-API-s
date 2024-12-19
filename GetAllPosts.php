@@ -81,8 +81,8 @@ $sql = "
         u.pp_id,
         p.body, 
         p.created_at, 
-        COALESCE(COUNT(l.id), 0) AS likes_count,
-        COALESCE(COUNT(c.id), 0) AS comment_count,
+        COALESCE(COUNT(DISTINCT l.id), 0) AS likes_count,
+        COALESCE(COUNT(DISTINCT c.id), 0) AS comment_count,
         CASE WHEN EXISTS (
             SELECT 1 FROM likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?
         ) THEN true ELSE false END AS isLiked
