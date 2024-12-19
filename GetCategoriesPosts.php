@@ -109,8 +109,8 @@ $sql = "
         u.pp_id,
         p.body, 
         p.created_at, 
-        COALESCE(COUNT(l.id), 0) AS likes_count,
-        COALESCE(COUNT(c.id), 0) AS comments_count,
+        COALESCE(COUNT(DISTINCT l.id), 0) AS likes_count,
+        COALESCE(COUNT(DISTINCT c.id), 0) AS comment_count,
         CASE 
             WHEN EXISTS (
                 SELECT 1 
@@ -175,7 +175,7 @@ if ($result && $result->num_rows > 0) {
             "created_at" => formatTimeDifference($row['created_at']),
             "text" => $row['body'],
             "likes_count" => (int)$row['likes_count'],
-            "commnets_count" => (int)$row['comments_count'],
+            "commnet_count" => (int)$row['comment_count'],
             "isLiked" => (bool)$row['isLiked']
         ];
     }
