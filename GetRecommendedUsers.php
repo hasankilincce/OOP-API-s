@@ -55,7 +55,7 @@ if ($stmt) {
 
         // Ortak takipçileri olan kullanıcıları sorgula
         $sql = "
-            SELECT u.username, u.name, u.pp_id, COUNT(f1.following_user_id) AS mutual_followers_count
+            SELECT u.username, u.name, u.pp_id, u.bio, COUNT(f1.following_user_id) AS mutual_followers_count
             FROM users u
             LEFT JOIN follows f1 ON u.id = f1.followed_user_id
             LEFT JOIN follows f2 ON f1.following_user_id = f2.followed_user_id
@@ -83,6 +83,7 @@ if ($stmt) {
                     $nonFollowedUsers[] = [
                         "username" => $row["username"],
                         "name" => $row["name"],
+                        "bio" => $row["bio"],
                         "pp_id" => $row["pp_id"],
                         "mutual_followers_count" => $row["mutual_followers_count"]
                     ];
@@ -90,7 +91,7 @@ if ($stmt) {
             } if (5 > $result2->num_rows) {
                 // Ortak takipçi yoksa rastgele kullanıcılar döndür
                 $sql = "
-                    SELECT username, name, pp_id 
+                    SELECT username, name, pp_id , bio
                     FROM users 
                     WHERE id != ? 
                     ORDER BY RAND() 
@@ -109,6 +110,7 @@ if ($stmt) {
                             $randomUsers[] = [
                                 "username" => $row["username"],
                                 "name" => $row["name"],
+                                "bio" => $row["bio"],
                                 "pp_id" => $row["pp_id"],
                                 "mutual_followers_count" => 0
                             ];
